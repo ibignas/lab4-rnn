@@ -1,10 +1,3 @@
-# ============================================================
-#  REGRESSION LAB — California Housing Prices (Kaggle CSV)
-#  Target: median_house_value
-#  Dataset: https://www.kaggle.com/datasets/camnugent/california-housing-prices
-# ============================================================
-
-# ── 0. IMPORTS ───────────────────────────────────────────────────────────────
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -26,8 +19,8 @@ os.makedirs('models',  exist_ok=True)
 os.makedirs('outputs', exist_ok=True)
 
 
-# ── 1. DATA ACQUISITION & EXPLORATION ────────────────────────────────────────
-df = pd.read_csv('housing.csv')          # place housing.csv in the same folder
+# Data exploration
+df = pd.read_csv('housing.csv')        
 
 print("=" * 55)
 print("DATASET OVERVIEW")
@@ -39,31 +32,30 @@ print(f"\nDescriptive statistics:\n{df.describe()}")
 print(f"\nMissing values:\n{df.isnull().sum()}")
 print(f"\nocean_proximity value counts:\n{df['ocean_proximity'].value_counts()}")
 
+# Data preprocessing
 
-# ── 2. DATA PREPROCESSING ────────────────────────────────────────────────────
-
-# 2a. Remove rows where target is NaN
+# Remove rows where target is NaN
 df.dropna(subset=['median_house_value'], inplace=True)
 
-# 2b. Impute missing numeric values with column median
+# Impute missing numeric values with column median
 for col in df.select_dtypes(include='number').columns:
     if df[col].isnull().any():
         median_val = df[col].median()
         df[col].fillna(median_val, inplace=True)
         print(f"  Imputed '{col}' with median = {median_val:.2f}")
 
-# 2c. Remove extreme outliers (top/bottom 1%)
+# Remove extreme outliers (top/bottom 1%)
 q_low  = df['median_house_value'].quantile(0.01)
 q_high = df['median_house_value'].quantile(0.99)
 df = df[(df['median_house_value'] >= q_low) & (df['median_house_value'] <= q_high)]
 
-# 2d. Feature engineering — derived features that improve model accuracy
+# Feature engineering — derived features that improve model accuracy
 df['rooms_per_household']    = df['total_rooms']    / df['households']
 df['bedrooms_per_room']      = df['total_bedrooms'] / df['total_rooms']
 df['population_per_household'] = df['population']   / df['households']
 df['income_per_room']        = df['median_income']  / (df['rooms_per_household'] + 1e-6)
 
-# 2e. Encode categorical variable: ocean_proximity (one-hot for better accuracy)
+#  Encode categorical variable: ocean_proximity
 df = pd.get_dummies(df, columns=['ocean_proximity'], prefix='ocean', drop_first=False)
 ocean_cols = [c for c in df.columns if c.startswith('ocean_')]
 # Convert boolean dummies to int
@@ -73,7 +65,7 @@ for col in ocean_cols:
 print(f"\nClean dataset shape: {df.shape}")
 print(f"Remaining NaNs     : {df.isnull().sum().sum()}")
 
-# 2f. Define features and target
+# Define features and target
 features = ['longitude', 'latitude', 'housing_median_age',
             'total_rooms', 'total_bedrooms', 'population', 'households',
             'median_income',
@@ -88,12 +80,12 @@ assert X.isnull().sum().sum() == 0, "NaNs still present in X!"
 print(f"Features used: {len(features)}")
 print("All NaNs resolved. Ready for modelling.")
 
-# 2g. Train / test split  (80 / 20)
+# Train / test split  (80 / 20)
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42
 )
 
-# 2h. Feature scaling
+# Feature scaling
 scaler     = StandardScaler()
 X_train_sc = scaler.fit_transform(X_train)
 X_test_sc  = scaler.transform(X_test)
@@ -101,10 +93,9 @@ X_test_sc  = scaler.transform(X_test)
 print(f"\nTrain size : {X_train_sc.shape[0]:,}")
 print(f"Test  size : {X_test_sc.shape[0]:,}")
 
+# Data vizualization
 
-# ── 3. DATA VISUALISATION ─────────────────────────────────────────────────────
-
-# 3a. Feature distributions (core features only)
+# Feature distributions
 core_cols = ['median_house_value', 'median_income', 'housing_median_age',
              'total_rooms', 'total_bedrooms', 'population',
              'households', 'rooms_per_household', 'bedrooms_per_room']
@@ -120,7 +111,7 @@ plt.savefig('outputs/01_distributions.png', dpi=150, bbox_inches='tight')
 plt.close()
 print("Saved: 01_distributions.png")
 
-# 3b. Boxplots – outlier detection
+# Boxplots – outlier detection
 fig, axes = plt.subplots(1, 4, figsize=(18, 5))
 fig.suptitle('Boxplots – Outlier Detection', fontsize=13)
 for ax, col in zip(axes, ['median_house_value', 'median_income',
@@ -137,7 +128,7 @@ plt.savefig('outputs/02_boxplots.png', dpi=150, bbox_inches='tight')
 plt.close()
 print("Saved: 02_boxplots.png")
 
-# 3c. Correlation heatmap (core numeric features only for readability)
+# Correlation heatmap
 corr_cols = ['median_house_value', 'median_income', 'housing_median_age',
              'total_rooms', 'total_bedrooms', 'population', 'households',
              'rooms_per_household', 'bedrooms_per_room',
@@ -152,14 +143,10 @@ plt.tight_layout()
 plt.savefig('outputs/03_correlation.png', dpi=150, bbox_inches='tight')
 plt.close()
 print("Saved: 03_correlation.png")
-# NOTE: total_rooms, total_bedrooms, households, population are highly
-#       correlated (r ~0.9) → multicollinearity inflates Linear Regression
-#       coefficient variance. Tree-based models are unaffected.
 
+# Regression models
 
-# ── 4. REGRESSION MODELS ─────────────────────────────────────────────────────
-
-# 4a. Linear Regression
+# Linear Regression
 print("\n[1/5] Training Linear Regression...")
 lr = LinearRegression()
 lr.fit(X_train_sc, y_train)
@@ -167,7 +154,7 @@ y_pred_lr = lr.predict(X_test_sc)
 joblib.dump(lr, 'models/linear_regression.pkl')
 print("      Done. Saved.")
 
-# 4b. Polynomial Regression (degree = 2)
+# Polynomial Regression (degree = 2)
 print("[2/5] Training Polynomial Regression (degree=2)...")
 poly_pipe = Pipeline([
     ('poly', PolynomialFeatures(degree=2, include_bias=False)),
@@ -178,12 +165,12 @@ y_pred_poly = poly_pipe.predict(X_test_sc)
 joblib.dump(poly_pipe, 'models/polynomial_regression.pkl')
 print("      Done. Saved.")
 
-# 4c. Decision Tree — deeper for accuracy
+# Decision Tree
 print("[3/5] Training Decision Tree...")
 dt = DecisionTreeRegressor(
-    max_depth=12,           # deeper than before (was 8)
-    min_samples_split=10,   # tighter splits (was 20)
-    min_samples_leaf=5,     # smaller leaves (was 10)
+    max_depth=12,           
+    min_samples_split=10,  
+    min_samples_leaf=5,   
     random_state=42
 )
 dt.fit(X_train_sc, y_train)
@@ -191,34 +178,34 @@ y_pred_dt = dt.predict(X_test_sc)
 joblib.dump(dt, 'models/decision_tree.pkl')
 print("      Done. Saved.")
 
-# 4d. Random Forest — more trees and deeper for accuracy (~2-3 min)
+# Random Forest
 print("[4/5] Training Random Forest (300 trees, depth=15) — this takes ~2-3 min...")
 rf = RandomForestRegressor(
-    n_estimators=300,       # more trees (was 100)
-    max_depth=15,           # deeper (was 12)
-    min_samples_split=5,    # tighter splits (was 10)
-    min_samples_leaf=3,     # smaller leaves
-    max_features='sqrt',    # standard best practice
+    n_estimators=300,       
+    max_depth=15,          
+    min_samples_split=5,   
+    min_samples_leaf=3,    
+    max_features='sqrt',   
     random_state=42,
-    n_jobs=-1               # use all CPU cores
+    n_jobs=-1              
 )
 rf.fit(X_train_sc, y_train)
 y_pred_rf = rf.predict(X_test_sc)
 joblib.dump(rf, 'models/random_forest.pkl')
 print("      Done. Saved.")
 
-# 4e. RNN (Deep MLP) — larger network, more epochs (~1 min)
+# 4e. RNN
 print("[5/5] Training RNN / Deep MLP...")
 rnn_model = MLPRegressor(
-    hidden_layer_sizes=(256, 128, 64, 32),  # deeper network (was 128,64,32)
+    hidden_layer_sizes=(256, 128, 64, 32), 
     activation='relu',
     solver='adam',
     learning_rate_init=0.001,
-    batch_size=256,         # smaller batches = more gradient steps (was 512)
-    max_iter=200,           # more epochs allowed (was 100)
+    batch_size=256,         
+    max_iter=200,          
     early_stopping=True,
     validation_fraction=0.1,
-    n_iter_no_change=15,    # more patience (was 10)
+    n_iter_no_change=15,   
     random_state=42,
     verbose=True
 )
@@ -229,7 +216,7 @@ joblib.dump(scaler,    'models/scaler.pkl')
 print("      Done. Saved.")
 
 
-# ── 5. EVALUATION METRICS ─────────────────────────────────────────────────────
+# Evaluation
 def get_metrics(name, y_true, y_pred):
     return {
         'Model'    : name,
@@ -254,7 +241,7 @@ results.to_csv('outputs/model_results.csv', index=False)
 print("\nSaved: model_results.csv")
 
 
-# ── 6. VISUALISATION PLOTS ────────────────────────────────────────────────────
+# Plots
 preds = {
     'Linear Reg.'  : y_pred_lr,
     'Poly Reg.'    : y_pred_poly,
@@ -263,7 +250,7 @@ preds = {
     'RNN (MLP)'    : y_pred_rnn
 }
 
-# 6a. Predictions vs Actual
+# Predictions vs Actual
 fig, axes = plt.subplots(1, 5, figsize=(22, 5))
 fig.suptitle('Predicted vs Actual House Value – All Models', fontsize=13)
 y_min, y_max = y_test.min(), y_test.max()
@@ -278,7 +265,7 @@ plt.savefig('outputs/04_predictions_vs_actual.png', dpi=150, bbox_inches='tight'
 plt.close()
 print("Saved: 04_predictions_vs_actual.png")
 
-# 6b. Residuals distribution
+# Residuals distribution
 fig, axes = plt.subplots(1, 5, figsize=(22, 4))
 fig.suptitle('Residuals Distribution – All Models', fontsize=13)
 for ax, (name, yp) in zip(axes, preds.items()):
@@ -292,7 +279,7 @@ plt.savefig('outputs/05_residuals.png', dpi=150, bbox_inches='tight')
 plt.close()
 print("Saved: 05_residuals.png")
 
-# 6c. Learning curves (Linear Regression + Decision Tree — fast models)
+# Learning curves
 print("\nGenerating learning curves (~1 min)...")
 fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 fig.suptitle('Learning Curves – Linear Regression & Decision Tree', fontsize=13)
@@ -301,9 +288,9 @@ for ax, (model, name) in zip(axes, [
         (DecisionTreeRegressor(max_depth=12, random_state=42), 'Decision Tree')]):
     sizes, tr_sc, val_sc = learning_curve(
         model, X_train_sc, y_train,
-        cv=5,                               # full 5-fold CV (was 3)
+        cv=5,                               
         scoring='r2',
-        train_sizes=np.linspace(0.1, 1.0, 8),  # 8 size points (was 5)
+        train_sizes=np.linspace(0.1, 1.0, 8),  
         n_jobs=-1
     )
     ax.plot(sizes, tr_sc.mean(axis=1),  'o-', color='steelblue', label='Train R²')
@@ -323,7 +310,7 @@ plt.savefig('outputs/06_learning_curves.png', dpi=150, bbox_inches='tight')
 plt.close()
 print("Saved: 06_learning_curves.png")
 
-# 6d. RNN loss curve
+# RNN loss curve
 fig, ax = plt.subplots(figsize=(9, 4))
 ax.plot(rnn_model.loss_curve_, color='steelblue', linewidth=2, label='Train Loss (MSE)')
 ax.set_title('RNN (Deep MLP) – Training Loss per Epoch')
@@ -335,7 +322,7 @@ plt.savefig('outputs/07_rnn_loss_curve.png', dpi=150, bbox_inches='tight')
 plt.close()
 print("Saved: 07_rnn_loss_curve.png")
 
-# 6e. Feature importance – Random Forest (top 15 features)
+# Feature importance – Random Forest (top 15 features)
 importances = pd.Series(rf.feature_importances_, index=features).sort_values().tail(15)
 fig, ax = plt.subplots(figsize=(9, 6))
 importances.plot(kind='barh', ax=ax, color='steelblue', edgecolor='white')
